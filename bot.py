@@ -1,9 +1,46 @@
+#!/usr/bin/env python3
+import subprocess
+import sys
+import pkg_resources
+import os
+
+# ================ АВТОМАТИЧЕСКАЯ УСТАНОВКА ЗАВИСИМОСТЕЙ ================
+required_packages = {
+    'discord': 'discord.py[voice]>=2.3.0',
+    'yt_dlp': 'yt-dlp>=2024.7.9',
+    'dotenv': 'python-dotenv>=1.0.0',
+    'nacl': 'PyNaCl>=1.5.0'
+}
+
+def install_package(package):
+    """Установка пакета"""
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", package])
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Ошибка установки {package}: {e}")
+        return False
+
+print("🔍 Проверка зависимостей...")
+for package_name, package_spec in required_packages.items():
+    try:
+        pkg_resources.get_distribution(package_name.replace('_', '-'))
+        print(f"✅ {package_name} уже установлен")
+    except pkg_resources.DistributionNotFound:
+        print(f"📦 Установка {package_name}...")
+        if not install_package(package_spec):
+            print(f"❌ Критическая ошибка: не удалось установить {package_name}")
+            sys.exit(1)
+
+print("=" * 50)
+# =========================================================================
+
+# Теперь импортируем все необходимое
 import discord
 from discord.ext import commands
 import yt_dlp
 import asyncio
 from collections import deque
-import os
 import re
 from dotenv import load_dotenv
 
@@ -11,7 +48,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ================ НАСТРОЙКИ ================
-TOKEN = os.getenv('DISCORD_TOKEN', 'ВАШ_ТОКЕН_СЮДА')
+TOKEN = os.getenv('DISCORD_TOKEN')
 PREFIX = '!'
 DEFAULT_VOLUME = 50
 MAX_QUEUE_SIZE = 100
@@ -49,7 +86,13 @@ ffmpeg_options = {
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
 }
 
-ydl = yt_dlp.YoutubeDL(ytdl_format_options)
+# Проверяем наличие yt-dlp и создаем экземпляр
+try:
+    ydl = yt_dlp.YoutubeDL(ytdl_format_options)
+    print("✅ yt-dlp успешно инициализирован")
+except Exception as e:
+    print(f"❌ Ошибка инициализации yt-dlp: {e}")
+    sys.exit(1)
 
 # ================ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ================
 def format_duration(seconds):
@@ -194,13 +237,7 @@ class MusicCommands(commands.Cog):
 
     @commands.command(name='play', aliases=['p'])
     async def play(self, ctx, *, query):
-        """Воспроизведение музыки с YouTube или SoundCloud
-        
-        Примеры:
-        !play https://www.youtube.com/watch?v=...
-        !play https://soundcloud.com/...
-        !play название песни
-        """
+        """Воспроизведение музыки с YouTube или SoundCloud"""
         # Проверка подключения
         if not ctx.author.voice:
             embed = discord.Embed(
@@ -705,11 +742,14 @@ async def on_command_error(ctx, error):
     await ctx.send(embed=embed)
 
 # Проверка токена
-if not TOKEN or TOKEN == 'ВАШ_ТОКЕН_СЮДА':
+if not TOKEN:
     print("❌ Ошибка: Токен не указан!")
-    print("Создайте файл .env и добавьте:")
-    print("DISCORD_TOKEN=ваш_токен_сюда")
+    print("Добавьте DISCORD_TOKEN в переменные окружения Bothost")
+    print("Или создайте файл .env с токеном")
     exit(1)
+
+print(f"🚀 Запуск бота с токеном: {TOKEN[:10]}...")
+print("=" * 50)
 
 # Запуск бота
 if __name__ == "__main__":
